@@ -105,7 +105,7 @@ GREEN✅✅✅
                             bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=message, parse_mode='html', disable_web_page_preview=True)
                             sent_matches[match_id]['goal'] = True
                 else:
-                    if scores_h == 0 and scores_a == 0 and h_attk is not None and a_attk is not None and h_attk >= 19 and a_attk >= 13 and tempo is not None and tempo >=16 and tempo <= 18 and mh1_home is not None and mh1_away is not None and mh1_home + mh1_away >= 31 and appm1_home is not None and appm1_away is not None and appm1_home >= 0.20 and appm1_away >= 0.15 and appm2_home is not None and appm2_away is not None and appm2_home >= 0.3 and appm2_away >= 0.2 and mh2_home is not None and mh2_away is not None and mh2_home + mh2_away >= 8 and mh3_home is not None and mh3_away is not None and mh3_home + mh3_away >= 4 and somaT is not None and somaH is not None and somaT + somaH / 2 >= 1 :
+                    if scores_h == 0 and scores_a == 0 and h_attk is not None and a_attk is not None and h_attk >= 19 and a_attk >= 13 and tempo is not None and tempo >=16 and tempo <= 88 and mh1_home is not None and mh1_away is not None and mh1_home + mh1_away >= 31 and appm1_home is not None and appm1_away is not None and appm1_home >= 0.20 and appm1_away >= 0.15 and appm2_home is not None and appm2_away is not None and appm2_home >= 0.3 and appm2_away >= 0.2 and mh2_home is not None and mh2_away is not None and mh2_home + mh2_away >= 8 and mh3_home is not None and mh3_away is not None and mh3_home + mh3_away >= 4 and somaT is not None and somaH is not None and somaT + somaH / 2 >= 1 :
                         
                         message = f"""
 🤖Novo Jogo
