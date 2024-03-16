@@ -2,141 +2,148 @@ import requests
 from fake_useragent import UserAgent
 import telebot
 import time
-import asyncio
 from datetime import datetime
 
+# Configurações iniciais
+today = datetime.now().strftime("%Y-%m-%d")
+token = '6297773878:AAHf-dwqVUjTlN4R8PN3wYELhDaUeGVC-a8'  # Insira aqui o seu token do bot Telegram
+chat_id = "-1001849167994"  # Insira aqui o chat_id do grupo ou usuário que receberá as mensagens
+bot = telebot.TeleBot(token)
+jogos_enviados = []
+
+# Instância do UserAgent para simular um navegador
 ua = UserAgent()
 
-
-bot_token = '6297773878:AAHf-dwqVUjTlN4R8PN3wYELhDaUeGVC-a8'
-chat_id = "-1001849167994"
-
-bot = telebot.TeleBot(token=bot_token)
-
-async def send_live_scores():
+def obter_dados_api():
+    url = "https://playscores.sportsat.app/gateway/api/v2/fixtures-svc/livescores?includes=league,stats,pressureStats&take=3000"
     headers = {'Accept': 'application/json', 'Origin': 'https://www.playscores.com', 'User-Agent': ua.random}
-    
-    url = f'https://playscores.sportsat.app/gateway/api/v1/fixtures-svc/v2/fixtures/livescores?include=weatherReport,additionalInfo,league,stats,pressureStats,probabilities&take=3000'
-    sent_matches = {}
-    while True:
+    try:
         response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        return response.json()
+    except requests.RequestException as e:
+        return None
 
-        if response.status_code != 200:
-            message = f"Erro ao acessar a API: {response.status_code}"
-            bot.send_message(chat_id=chat_id, text=message)
-        else:
-            data = response.json()
-            for match in data['data']:
-                chance = match.get('probabilities', {}).get('over_0_5')                                             
-                match_stats = match.get('stats')
-                if match_stats is not None:
-                    h_attk = match_stats.get('attacks', {}).get('home', 0)   
-                    a_attk = match_stats.get('attacks', {}).get('away', 0)
-                    dh_attk = match_stats.get('dangerousAttacks', {}).get('home', 0)
-                    da_attk = match_stats.get('dangerousAttacks', {}).get('away', 0)
-                    p_home = match_stats.get('possessiontime', {}).get('home', 0)
-                    p_away = match_stats.get('possessiontime', {}).get('away', 0)
-                    es_home = match_stats.get('corners', {}).get('home', 0)
-                    es_away = match_stats.get('corners', {}).get('away', 0)
-                    shotGol_h = match_stats.get('shotsOngoal', {}).get('home', 0)
-                    shotGol_a = match_stats.get('shotsOngoal', {}).get('away', 0)
-                    shotNo_h = match_stats.get('shotsOffgoal', {}).get('home', 0)
-                    shotNo_a = match_stats.get('shotsOffgoal', {}).get('away', 0)
-                    somaT = shotGol_h + shotNo_h if shotGol_h is not None and shotNo_h is not None else 0
-                    somaH = shotGol_a + shotNo_a if shotGol_a is not None and shotNo_a is not None else 0
-                    pressure_stats = match.get('pressureStats')
-                    if pressure_stats is not None:
-                        goal_home = pressure_stats.get('exg', {}).get('home')
-                        goal_away = pressure_stats.get('exg', {}).get('away')     
-                        mh1_home = pressure_stats.get('mh1', {}).get('home', 0)
-                        mh1_away = pressure_stats.get('mh1', {}).get('away', 0)
-                        mh2_home = pressure_stats.get('mh2', {}).get('home', 0)
-                        mh2_away = pressure_stats.get('mh2', {}).get('away', 0)
-                        mh3_home = pressure_stats.get('mh3', {}).get('home', 0)
-                        mh3_away = pressure_stats.get('mh3', {}).get('away', 0)
-                        appm1_home = pressure_stats.get('appm1', {}).get('home', 0)
-                        appm1_away = pressure_stats.get('appm1', {}).get('away', 0)
-                        appm2_home = pressure_stats.get('appm2', {}).get('home', 0)
-                        appm2_away = pressure_stats.get('appm2', {}).get('away', 0)
-                  
-                    tempo = match.get('currentTime', {}).get('minute')
-                    scores_h = match.get('scores', {}).get('homeTeamScore')
-                    scores_a = match.get('scores', {}).get('awayTeamScore')
-                    home = match.get('homeTeam', {}).get('name', {})
-                    espc = home.replace(" ","%20")
-                    away = match.get('awayTeam', {}).get('name', {})
-                    tempo = match.get('currentTime', {}).get('minute')
-                    link = f"https://www.bet365.com/#/AX/K^{espc}"
+def construir_mensagem(game, strategy):
+    home_team = game["homeTeam"]["name"]
+    away_team = game["awayTeam"]["name"]
+    league = game["league"]["name"]
+    home_score = game['scores']['homeTeamScore']
+    away_score = game['scores']['awayTeamScore']
+    minute = game["currentTime"]["minute"]
+    convert_nome = home_team.replace(" ", "+")
+    link_bet365 = f"https://www.bet365.com/#/AX/K%5E{convert_nome}/"
+    
+    # Detalhes estatísticos
+    stats = {
+        'home_exg': game['pressureStats']['exg']['home'],
+        'away_exg': game['pressureStats']['exg']['away'],
+        # Adicione mais estatísticas conforme necessário...
+    }
 
-                # Verificar se a partida já foi enviada
-                match_id = f"{home} - {away}"
-                if match_id in sent_matches:
-                    if scores_h > sent_matches[match_id]['scores_h'] or scores_a > sent_matches[match_id]['scores_a']:
-                        # Houve um gol, então edite a mensagem original adicionando "GREEN"
-                        if not sent_matches[match_id]['goal'] and tempo >= 18 and tempo <= 45:
-                            
-                            message = f"""
-🤖Novo Jogo
+    mensagem = f'''🔥 JOGO QUENTE 🔥
 
-{home} - {away}
-⏰{tempo} minutos do 1° Tempo
+🆚 <b>{home_team} x {away_team}</b>
+🏆 {league}
+⏰ {minute}' minutos
 
-📱<a href='{link}'><b>Link do jogo</b></a>
+🚨 <b>{strategy}</b>
 
-🤖Inteligencia Artificial DEZBET:
-⭐️Mais de 0.5 no 1° tempo➜ {chance}%
+📛 Odd recomendada: +1.50
+💰 Stake: 1% a 2%
+⚠️ Respeite sua meta diária!
 
-📊 Eventos da Partida:
-(Casa/Visitante)
---Ataques: {h_attk}/{a_attk}
---Ataques Perigosos: {dh_attk}/{da_attk}
---Posse de Bola: {p_home}/{p_away}
---Escanteios: {es_home}/{es_away}
+🔍 <b>Estatísticas(Casa - Fora):</b>
+📈 Placar: {home_score} - {away_score}
+⛳️ Escanteios: {game['stats']['corners']['home']} - {game['stats']['corners']['away']}
 
-🎯Chances de Gol:
-(Casa/Fora)
---Chutes no Gol: {shotGol_h}/{shotGol_a}
---Chutes fora do Gol: {shotNo_h}/{shotNo_a}
---Chutes Total: {somaT}/{somaH}
---ExG: {goal_home}/{goal_away}
-GREEN✅✅✅
-"""
-                            message_id = sent_matches[match_id]['message_id']
-                            bot.edit_message_text(chat_id=chat_id, message_id=message_id, text=message, parse_mode='html', disable_web_page_preview=True)
-                            sent_matches[match_id]['goal'] = True
-                else:
-                    if scores_h == 0 and scores_a == 0 and h_attk is not None and a_attk is not None and h_attk >= 19 and a_attk >= 13 and tempo is not None and tempo >=16 and tempo <= 88 and mh1_home is not None and mh1_away is not None and mh1_home + mh1_away >= 31 and appm1_home is not None and appm1_away is not None and appm1_home >= 0.20 and appm1_away >= 0.15 and appm2_home is not None and appm2_away is not None and appm2_home >= 0.3 and appm2_away >= 0.2 and mh2_home is not None and mh2_away is not None and mh2_home + mh2_away >= 8 and mh3_home is not None and mh3_away is not None and mh3_home + mh3_away >= 4 and somaT is not None and somaH is not None and somaT + somaH / 2 >= 1 :
-                        
-                        message = f"""
-🤖Novo Jogo
+📲 <a href="{link_bet365}">Bet365</a>'''
 
-{home} - {away}
-⏰{tempo} minutos do 1° Tempo
+    return mensagem
 
-📱<a href='{link}'><b>Link do jogo</b></a>
+def analisar_jogo(game):
+    minute = game.get("currentTime", {}).get("minute")
 
-🤖Inteligencia Artificial DEZ BET:
-⭐️Mais de 0.5 no 1° tempo➜ {chance}%
+    if minute is None or not isinstance(minute, int):
+        return None
 
-📊 Eventos da Partida:
-(Casa/Visitante)
---Ataques: {h_attk}/{a_attk}
---Ataques Perigosos: {dh_attk}/{da_attk}
---Posse de Bola: {p_home}/{p_away}
---Escanteios: {es_home}/{es_away}
+    home_score = game['scores']['homeTeamScore']
+    away_score = game['scores']['awayTeamScore']
+    score_difference = abs(home_score - away_score)
 
-🎯Chances de Gol:
-(Casa/Fora)
---Chutes no Gol: {shotGol_h}/{shotGol_a}
---Chutes fora do Gol: {shotNo_h}/{shotNo_a}
---Chutes Total: {somaT}/{somaH}
---ExG: {goal_home}/{goal_away}
-"""
-                        msg = bot.send_message(chat_id=chat_id, text=message, parse_mode="html", disable_web_page_preview=True)
-                        # Adicionar a partida enviada ao conjunto de partidas já enviadas
-                        sent_matches[match_id] = {'message_id': msg.message_id, 'goal': False, 'scores_h': scores_h, 'scores_a': scores_a}
-                  
-        await asyncio.sleep(120)
-                
-if __name__ == '__main__':
-    asyncio.run(send_live_scores())
+    if score_difference <= 1:
+
+        # Verifique se 'pressureStats' e 'exg' existem e não são None antes de prosseguir
+        pressure_stats = game.get('pressureStats')
+        if pressure_stats is None:
+            return None  # Se 'pressureStats' for None, não há como prosseguir
+
+        exg_home = pressure_stats.get('exg', {}).get('home', 0)
+        exg_away = pressure_stats.get('exg', {}).get('away', 0)
+
+        # Verificações semelhantes podem ser necessárias para 'mh1' e 'appm2' se eles também puderem ser None
+        mh1_stats = pressure_stats.get('mh1', {})
+        mh1_home = mh1_stats.get('home', 0)
+        mh1_away = mh1_stats.get('away', 0)
+
+        apm2_stats = pressure_stats.get('appm2', {})
+        apm2_home = apm2_stats.get('home', 0)
+        apm2_away = apm2_stats.get('away', 0)
+
+        total_corners = game.get('stats', {}).get('corners', {})
+        total_corners_home = total_corners.get('home', 0)
+        total_corners_away = total_corners.get('away', 0)
+
+        # Estratégia para Over Gols - Casa
+        if exg_home > 1.5 and mh1_home > 50 and 50 <= minute <= 75:
+            return "Over Gol Casa"
+
+        # Estratégia para Over Gols - Fora
+        if exg_away > 1.5 and mh1_away > 50 and 50 <= minute <= 75:
+            return "Over Gol Fora"
+
+        # Estratégia para Over Cantos - Casa
+        if apm2_home > 1 and total_corners_home < (minute / 10) and 30 <= minute <= 38:
+            return "Over Cantos HT Casa"
+
+        # Estratégia para Over Cantos - Fora
+        if minute >= 4:
+            return "Over Cantos HT Fora"
+
+        # Estratégia para Over Cantos - Casa
+        if minute >= 3:
+            return "Over Cantos FT Casa"
+
+        # Estratégia para Over Cantos - Fora
+        if minute >= 4:
+            return "Over Cantos FT Fora"
+
+    return None
+
+def verificar_dados_e_enviar(dados):
+    if dados is None:
+        return
+
+    for game in dados['data']:
+        if game is None:
+            continue
+        fixture_id = game['fixtureId']
+        if fixture_id in jogos_enviados:
+            continue
+
+        strategy = analisar_jogo(game)
+        if strategy:
+            mensagem = construir_mensagem(game, strategy)
+            enviar_mensagem_telegram(mensagem, chat_id)
+            jogos_enviados.append(fixture_id)
+
+def enviar_mensagem_telegram(mensagem, chat_id):
+    try:
+        bot.send_message(chat_id, mensagem, disable_web_page_preview=True, parse_mode='HTML')
+    except Exception as e:
+        return
+
+while True:
+    dados = obter_dados_api()
+    verificar_dados_e_enviar(dados)
+    time.sleep(180)  # Intervalo entre verificações
