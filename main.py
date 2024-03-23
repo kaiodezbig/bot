@@ -15,7 +15,7 @@ jogos_enviados = []
 ua = UserAgent()
 
 def obter_dados_api():
-    url = "https://playscores.sportsat.app/gateway/api/v2/fixtures-svc/livescores?includes=league,stats,pressureStats&take=3000"
+    url = "https://api.sportsanalytics.com.br/api/v1/fixtures-svc/fixtures/livescores?include=weatherReport,additionalInfo,league,stats,pressureStats,probabilities&api_key=0jS6sjgy0jtAfk82AzxZKxc78Z4y9FJn"
     headers = {'Accept': 'application/json', 'Origin': 'https://www.playscores.com', 'User-Agent': ua.random}
     try:
         response = requests.get(url, headers=headers)
